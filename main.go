@@ -169,8 +169,7 @@ EXAMPLES:
 
 ENVIRONMENT VARIABLES:
   SECRET_FILE_PATH  Path to file containing the secret/password
-  PORT             Port for HTTP server mode (default: 8080)
-`)
+  PORT             Port for HTTP server mode (default: 8080)`)
 }
 
 func main() {
