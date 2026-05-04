@@ -101,12 +101,40 @@ Three GitHub Actions workflows:
 
 ### `pr.yaml` -- PR Validation
 
-Four parallel jobs run on every pull request:
+Five parallel jobs run on every pull request:
 
 1. **Go Test & Lint** -- `go test -race`, `go vet`, golangci-lint
 2. **Dockerfile Lint** -- hadolint for Dockerfile best practices
 3. **Security Scan** -- govulncheck for Go dependency CVEs + Trivy filesystem scan
 4. **Helm Lint** -- `helm lint`, dependency build, template rendering test
+5. **Integration Test** -- Full end-to-end validation:
+   - Builds the Docker image
+   - Scans the image with Trivy (CRITICAL/HIGH gate)
+   - Spins up a Kind cluster with Envoy Gateway
+   - Deploys the service with Helm
+   - Tests all endpoints (health, ping, pong, unauthorized access)
+   - Verifies security context (non-root, read-only fs, capabilities dropped)
+
+#### Production: Ephemeral PR Environments
+
+The in-CI Kind cluster validates functionality, but in a production setup you would deploy each PR to an **ephemeral environment** on the shared cluster for more realistic testing:
+
+1. **PR opened** -- CI builds and pushes the image tagged with `pr-<number>` to the registry
+2. **Namespace provisioned** -- A controller (e.g., ArgoCD ApplicationSet with PR generator, or a custom operator) creates a dedicated namespace `pr-<number>` with:
+   - The service deployed with the PR image tag
+   - An HTTPRoute with a unique hostname (e.g., `pr-123.dev.example.com`)
+   - Secrets synced via ESO from a shared dev secret store
+   - Resource quotas to prevent runaway PR environments from affecting the cluster
+3. **PR updated** -- Image is rebuilt, ArgoCD auto-syncs the new tag
+4. **PR merged/closed** -- Namespace and all resources are automatically deleted
+
+Benefits over in-CI Kind clusters:
+- Tests against real infrastructure (load balancers, DNS, TLS, ESO)
+- Other team members can access the PR environment for manual testing
+- Can run longer-lived tests (performance, soak tests)
+- Shared dependencies (databases, message queues) can be available
+
+The trade-off is complexity -- you need namespace lifecycle management, DNS automation, and resource cleanup. Tools like ArgoCD ApplicationSets (with PR generators), Crossplane, or a custom queue-based controller (similar to the pattern used at scale) handle this well.
 
 ### `release-please.yaml` -- Automated Versioning
 
