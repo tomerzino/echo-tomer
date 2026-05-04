@@ -1,3 +1,4 @@
+// Ping-Pong Game - HTTP server and CLI for playing ping pong
 package main
 
 import (
@@ -38,7 +39,11 @@ func readSecretFromFile() error {
 	if err != nil {
 		return fmt.Errorf("failed to open secret file %s: %v", secretPath, err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing secret file: %v", err)
+		}
+	}()
 
 	secretBytes, err := io.ReadAll(file)
 	if err != nil {
@@ -61,9 +66,11 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if authHeader == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{
+			if err := json.NewEncoder(w).Encode(map[string]string{
 				"error": "Authorization header required",
-			})
+			}); err != nil {
+				log.Printf("Error encoding unauthorized response: %v", err)
+			}
 			log.Printf("🚫 Unauthorized access attempt from %s - missing auth header", r.RemoteAddr)
 			return
 		}
@@ -77,9 +84,11 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if token != secret {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{
+			if err := json.NewEncoder(w).Encode(map[string]string{
 				"error": "Invalid authorization token",
-			})
+			}); err != nil {
+				log.Printf("Error encoding unauthorized response: %v", err)
+			}
 			log.Printf("🚫 Unauthorized access attempt from %s - invalid token", r.RemoteAddr)
 			return
 		}
@@ -168,8 +177,7 @@ EXAMPLES:
 
 ENVIRONMENT VARIABLES:
   SECRET_FILE_PATH  Path to file containing the secret/password
-  PORT             Port for HTTP server mode (default: 8080)
-`)
+  PORT             Port for HTTP server mode (default: 8080)`)
 }
 
 func main() {
@@ -370,7 +378,9 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, html)
+	if _, err := fmt.Fprint(w, html); err != nil {
+		log.Printf("Error writing root response: %v", err)
+	}
 
 	log.Printf("📄 Root page served to %s", r.RemoteAddr)
 }
