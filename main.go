@@ -1,3 +1,4 @@
+// Ping-Pong Game - HTTP server and CLI for playing ping pong
 package main
 
 import (
