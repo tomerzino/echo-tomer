@@ -35,7 +35,6 @@ Thumbs.db
 *.log
 
 # Docker
-.dockerignore
 
 # Kubernetes secrets (if any)
 secrets/

@@ -1,0 +1,15 @@
+.git
+.github
+.gitignore
+.claude
+.sops.yaml
+README.md
+docs/
+charts/
+deploy/
+k8s/
+secrets/
+*.md
+*.log
+.env*
+.DS_Store
