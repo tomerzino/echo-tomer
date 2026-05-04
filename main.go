@@ -39,7 +39,11 @@ func readSecretFromFile() error {
 	if err != nil {
 		return fmt.Errorf("failed to open secret file %s: %v", secretPath, err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("Error closing secret file: %v", err)
+		}
+	}()
 
 	secretBytes, err := io.ReadAll(file)
 	if err != nil {
@@ -374,7 +378,9 @@ func rootHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, html)
+	if _, err := fmt.Fprint(w, html); err != nil {
+		log.Printf("Error writing root response: %v", err)
+	}
 
 	log.Printf("📄 Root page served to %s", r.RemoteAddr)
 }
