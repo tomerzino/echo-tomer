@@ -62,9 +62,11 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if authHeader == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{
+			if err := json.NewEncoder(w).Encode(map[string]string{
 				"error": "Authorization header required",
-			})
+			}); err != nil {
+				log.Printf("Error encoding unauthorized response: %v", err)
+			}
 			log.Printf("🚫 Unauthorized access attempt from %s - missing auth header", r.RemoteAddr)
 			return
 		}
@@ -78,9 +80,11 @@ func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if token != secret {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{
+			if err := json.NewEncoder(w).Encode(map[string]string{
 				"error": "Invalid authorization token",
-			})
+			}); err != nil {
+				log.Printf("Error encoding unauthorized response: %v", err)
+			}
 			log.Printf("🚫 Unauthorized access attempt from %s - invalid token", r.RemoteAddr)
 			return
 		}
