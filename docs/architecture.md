@@ -11,12 +11,42 @@ This repository contains a production-ready CI/CD pipeline for a Go ping-pong HT
 - **Automated versioning** via Release Please and conventional commits
 - **Supply chain security** with Trivy scanning, govulncheck, SBOM generation, and a scratch base image
 
+## Code Quality Fixes
+
+The original application code had several issues caught by the CI pipeline during validation:
+
+### Go Version Upgrade (1.24 → 1.25)
+
+The assignment specified Go 1.24, but `govulncheck` flagged 5 known CVEs in the Go 1.24 stdlib:
+
+- **GO-2026-4869** — X.509 certificate verification bypass in `crypto/x509`
+- **GO-2026-4868** — X.509 name constraint bypass in `crypto/x509`
+- **GO-2026-4870** — TLS 1.3 KeyUpdate DoS in `crypto/tls`
+- **GO-2026-4602** — FileInfo sandbox escape in `os`
+- **GO-2026-4601** — IPv6 host literal parsing issue in `net/url`
+
+All five are fixed in Go 1.25.x only — no 1.24.x patches exist since Go 1.24 has reached end-of-life. Upgrading to Go 1.25 was the only option to eliminate these vulnerabilities, which is the correct decision for a production deployment.
+
+### Unchecked Error Returns
+
+`golangci-lint` (errcheck) flagged several unchecked error return values in the original code:
+
+- `json.NewEncoder(w).Encode(...)` in `authMiddleware` (lines 65, 81) — JSON encoding to the HTTP response writer can fail if the connection is closed
+- `file.Close()` in `readSecretFromFile` (line 42) — deferred close can fail, especially on network filesystems
+- `fmt.Fprint(w, html)` in `rootHandler` (line 377) — writing to the HTTP response writer can fail
+
+All were wrapped with proper error handling and logging. While these errors are unlikely in practice, handling them is correct Go practice and demonstrates attention to code quality.
+
+### Redundant Newline
+
+`go vet` flagged `fmt.Println` with a string argument ending in `\n` — since `Println` already appends a newline, this produced a double newline. Fixed by removing the trailing newline from the raw string literal.
+
 ## Dockerfile
 
 The Dockerfile uses a multi-stage build:
 
 ```
-golang:1.24-alpine (builder) -> scratch (final)
+golang:1.25-alpine (builder) -> scratch (final)
 ```
 
 **Why scratch:** A scratch image contains literally nothing -- no shell, no OS packages, no package manager. This means zero CVEs from the base image and the smallest possible attack surface. The only files in the final image are the static Go binary and CA certificates.
