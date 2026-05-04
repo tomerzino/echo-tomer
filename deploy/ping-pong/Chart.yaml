@@ -1,0 +1,11 @@
+apiVersion: v2
+name: ping-pong
+description: Ping-Pong game service deployment
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+dependencies:
+  - name: common
+    version: 0.1.0
+    repository: file://../../charts/common

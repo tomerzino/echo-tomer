@@ -1,0 +1,101 @@
+common:
+  nameOverride: ping-pong
+  fullnameOverride: ping-pong
+
+  image:
+    repository: ghcr.io/tomer-zino/ping-pong
+    tag: v0.1.0
+    pullPolicy: IfNotPresent
+
+  replicaCount: 2
+
+  port: 8080
+
+  env:
+    PORT: "8080"
+    SECRET_FILE_PATH: "/secrets/token"
+
+  secretMount:
+    enabled: true
+    mountPath: /secrets
+    secretName: ping-pong
+    key: token
+
+  secret:
+    enabled: true
+    data: {}
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: http
+
+  httpRoute:
+    enabled: true
+    parentRefs:
+      - name: envoy-gateway
+        namespace: envoy-gateway-system
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /ping
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /pong
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /health
+      - matches:
+          - path:
+              type: Exact
+              value: /
+
+  startupProbe:
+    enabled: true
+    httpGet:
+      path: /health
+      port: http
+    failureThreshold: 12
+    periodSeconds: 5
+
+  readinessProbe:
+    enabled: true
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  livenessProbe:
+    enabled: true
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 0
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                  - arm64

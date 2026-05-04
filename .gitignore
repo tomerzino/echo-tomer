@@ -42,4 +42,16 @@ secrets/
 # Environment files
 .env
 .env.local
-.env.*.local 
+.env.*.local
+
+# SOPS age keys
+keys.txt
+*.agekey
+
+# Helm
+deploy/*/charts/
+*.tgz
+
+# Helm secrets temp files
+secrets.yaml.dec
+*.yaml.dec
