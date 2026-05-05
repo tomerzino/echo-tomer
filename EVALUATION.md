@@ -107,9 +107,14 @@ Five parallel jobs on every pull request:
 
 ### Automated Versioning (`release-please.yaml`)
 - Runs on push to `main`
-- Analyzes conventional commits (`feat:` = minor, `fix:` = patch, `BREAKING CHANGE` = major)
-- Opens a Release PR with generated changelog
+- Analyzes conventional commits and opens a Release PR with generated changelog
 - Creates git tag + GitHub Release when merged
+
+**Only these prefixes trigger a release:**
+- `feat:` → minor bump, `fix:` → patch bump, `feat!:` / `BREAKING CHANGE:` → major bump
+
+**These prefixes do NOT trigger a release:** `docs:`, `chore:`, `ci:`, `refactor:`, `test:`
+— the workflow runs but takes no action. A README-only change won't produce a version bump.
 
 ### Build & Publish (`release.yaml`)
 Triggered by `v*` tags:

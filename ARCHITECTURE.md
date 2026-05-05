@@ -189,8 +189,23 @@ The trade-off is complexity -- you need namespace lifecycle management, DNS auto
 
 Runs on push to `main`. Release Please analyzes conventional commit messages and:
 - Opens/updates a Release PR with a generated changelog
-- Bumps the version according to commit types (feat = minor, fix = patch, breaking = major)
+- Bumps the version according to commit types
 - Creates a git tag and GitHub Release when the Release PR merges
+
+**Commit prefixes and their effect:**
+
+| Prefix | Effect | Example |
+|---|---|---|
+| `feat:` | Minor version bump (v1.1.0 → v1.2.0) | `feat: add /status endpoint` |
+| `fix:` | Patch version bump (v1.2.0 → v1.2.1) | `fix: handle timeout on /ping` |
+| `feat!:` / `BREAKING CHANGE:` | Major version bump (v1.2.1 → v2.0.0) | `feat!: change auth to OAuth` |
+| `docs:` | No release | `docs: update README` |
+| `chore:` | No release | `chore: update .gitignore` |
+| `ci:` | No release | `ci: add caching to workflow` |
+| `refactor:` | No release | `refactor: extract auth middleware` |
+| `test:` | No release | `test: add edge case coverage` |
+
+Only `feat` and `fix` commits (and breaking changes) produce a version bump. All other prefixes are tracked in git history but do not trigger a release — the workflow runs but takes no action.
 
 ### `release.yaml` -- Build & Publish
 

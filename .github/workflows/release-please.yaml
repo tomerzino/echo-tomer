@@ -22,3 +22,4 @@ jobs:
         id: release
         with:
           release-type: go
+          token: ${{ secrets.PAT_TOKEN }}
