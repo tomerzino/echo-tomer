@@ -96,6 +96,11 @@ kubectl describe pod -n ping-pong -l app.kubernetes.io/name=ping-pong
 kubectl logs -n ping-pong -l app.kubernetes.io/name=ping-pong --tail=50
 ```
 
+**View pod distribution across nodes:**
+```bash
+kubectl get pods -n ping-pong -o wide
+```
+
 **Port 8080 already in use:**
 ```bash
 lsof -i :8080 | awk 'NR>1 {print $2}' | xargs kill
