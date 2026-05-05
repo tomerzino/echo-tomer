@@ -1,5 +1,7 @@
 # Local Development Guide
 
+> For architecture details and evaluation Q&A, see [ARCHITECTURE.md](ARCHITECTURE.md) and [EVALUATION.md](EVALUATION.md).
+
 ## Prerequisites
 
 | Tool | Install |
