@@ -7,7 +7,7 @@ common:
     tag: v0.1.0
     pullPolicy: IfNotPresent
 
-  replicaCount: 2
+  replicaCount: 3
 
   port: 8080
 
