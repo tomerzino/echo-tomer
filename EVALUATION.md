@@ -162,6 +162,10 @@ The container runtime (containerd) on each node reads the manifest list, matches
 | Mac (Apple Silicon) + Docker | arm64 layers |
 | Mac (Intel) + Docker | amd64 layers |
 
+**CI Runners — free tier vs production:**
+
+This repo uses GitHub's free-tier shared runners. ARM64 runners have limited pool availability, causing occasional queue delays. In production, the solution is **self-hosted runners** on your own infrastructure (e.g., EC2 Graviton instances managed by [actions-runner-controller](https://github.com/actions/actions-runner-controller) on EKS) — zero queue wait, predictable performance, and network locality to registries.
+
 ---
 
 ## 6. Versioning and Tagging Strategy

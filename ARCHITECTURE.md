@@ -574,6 +574,20 @@ The pipeline structure:
 
 This is a production-grade pattern -- it is language-agnostic (not relying on Go's cross-compilation), and each architecture gets a Trivy scan before the manifest is created.
 
+### CI Runners: Free Tier vs Production
+
+This repository uses GitHub's **free-tier shared runners**. ARM64 runners (`ubuntu-24.04-arm64`) are newer and have limited availability in the free pool, which can cause queue delays of 1-5 minutes.
+
+**Production-ready solution:**
+
+| Approach | How | Benefit |
+|---|---|---|
+| **Self-hosted runners (recommended)** | Run GitHub Actions runners on your own infrastructure (EC2 Graviton for ARM, standard instances for x86) using [actions-runner-controller](https://github.com/actions/actions-runner-controller) on Kubernetes | Zero queue wait, predictable performance, cost control, network locality to registries |
+| **GitHub Larger Runners** | GitHub Team/Enterprise plan with dedicated runner pools | No infrastructure to manage, guaranteed capacity, SLA-backed |
+| **Hybrid** | Self-hosted for heavy jobs (Docker builds), GitHub-hosted for lightweight jobs (lint, test) | Balance cost vs management overhead |
+
+In a real company, self-hosted runners on EKS with autoscaling (scale-to-zero when idle, scale-up on demand) provide the best combination of speed, cost efficiency, and reliability. The runners sit in the same VPC as ECR, eliminating image push latency.
+
 ### How Multi-Arch Image Selection Works
 
 The `create-manifest` job produces a **Docker manifest list** -- a single image reference that contains pointers to multiple architecture-specific images:
