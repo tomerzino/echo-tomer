@@ -104,7 +104,7 @@ Key decisions:
 - `CGO_ENABLED=0` produces a fully static binary with no libc dependency, required for scratch
 - `-ldflags="-s -w"` strips debug symbols and DWARF info, reducing binary size
 - CA certificates copied from the builder stage to support outbound HTTPS
-- `USER 65534:65534` (nobody) -- the container never runs as root
+- `USER 65534:65534` (nobody) -- the container never runs as root. UID 65534 is the well-known `nobody` user in Linux — the highest UID before the 16-bit overflow, universally mapped to a user that owns no files and has no privileges. It's the standard convention for minimal-privilege containers (used by Google's distroless images, Kubernetes official examples, and security benchmarks). Since scratch has no `/etc/passwd`, the UID doesn't resolve to a name, but the kernel and Kubernetes only enforce the numeric ID.
 
 ## Helm Common Chart
 

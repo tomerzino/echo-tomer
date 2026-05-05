@@ -1,5 +1,7 @@
 # 🏓 DevOps Home Assignment: Ping-Pong Game Deployment
 
+> **Implementation details:** See [architecture.md](architecture.md) for a full explanation of all architecture decisions, security measures, CI/CD pipeline, secrets management, scaling strategy, and how each assignment requirement is implemented.
+
 ## 📋 Overview
 
 **⏱️ Duration:** 2-3 hours  
