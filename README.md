@@ -1,6 +1,10 @@
 # 🏓 DevOps Home Assignment: Ping-Pong Game Deployment
 
 > **Implementation details:** See [architecture.md](architecture.md) for a full explanation of all architecture decisions, security measures, CI/CD pipeline, secrets management, scaling strategy, and how each assignment requirement is implemented.
+>
+> **Evaluation Q&A:** See [EVALUATION.md](EVALUATION.md) for detailed answers to all evaluation questions (deployment strategy, scaling, security, EKS, multi-arch, versioning, global distribution, image lifecycle).
+>
+> **Local development:** See [DEPLOYMENT.md](DEPLOYMENT.md) for developer quick-start guide (prerequisites, make commands, troubleshooting).
 
 ## 📋 Overview
 

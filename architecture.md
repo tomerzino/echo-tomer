@@ -6,7 +6,7 @@ This repository contains a production-ready CI/CD pipeline for a Go ping-pong HT
 
 - **Multi-arch Docker images** built on parallel native runners (amd64 + arm64)
 - **Helm-based deployment** using a reusable common chart pattern
-- **SOPS-encrypted secrets** with an External Secrets Operator (ESO) toggle for production
+- **External Secrets Operator** for production secrets management (no secrets in git)
 - **Gateway API ingress** (HTTPRoute) instead of deprecated nginx-ingress
 - **Automated versioning** via Release Please and conventional commits
 - **Supply chain security** with Trivy scanning, govulncheck, SBOM generation, and a scratch base image
@@ -20,7 +20,7 @@ This repository contains a production-ready CI/CD pipeline for a Go ping-pong HT
 | **No containers running as root** | `USER 65534:65534` in Dockerfile sets the runtime user to `nobody`. Kubernetes enforces `runAsNonRoot: true` + `runAsUser: 65534` in the pod security context — if any container tries to run as root, the kubelet refuses to start it. CI integration test verifies this on every PR. | `Dockerfile:19`, `charts/common/values.yaml:87-91`, `.github/workflows/pr.yaml:164-171` |
 | **All images must pass security scans** | Every image is scanned with Trivy (CRITICAL/HIGH severity, `exit-code: 1`) at multiple stages: filesystem scan on PR, built image scan in integration test, and per-architecture image scan in release pipeline. Additionally, `govulncheck` scans Go dependencies at call-graph level and `hadolint` validates the Dockerfile. | `.github/workflows/pr.yaml:59-65,101-107`, `.github/workflows/release.yaml:43-49,77-83` |
 | **No critical/high vulnerabilities released to production** | Trivy image scans with `exit-code: 1` gate both the amd64 and arm64 builds in the release pipeline. The scans run *before* `create-manifest`, so a vulnerable image can never become part of a published multi-arch manifest. The release is blocked and no tag is pushed to the registry. | `.github/workflows/release.yaml:43-49,77-83` (run before `create-manifest` at line 85) |
-| **No secrets in codebase** | Secrets are encrypted in-repo using SOPS + age encryption (`values-secrets.enc.yaml` contains only ciphertext). The age private key is excluded via `.gitignore` and stored only in `~/.sops/keys.txt` (local) or as a GitHub Actions secret (CI). In production, ESO pulls secrets from a cloud store — no keys or plaintext ever touch git. | `.sops.yaml`, `deploy/ping-pong/values-secrets.enc.yaml`, `.gitignore:47-49` |
+| **No secrets in codebase** | No secret values exist anywhere in the repository. Staging and production use External Secrets Operator to sync secrets from a cloud store (AWS Secrets Manager / Akeyless) into Kubernetes Secrets. Local dev and CI use throwaway test tokens passed via `--set` at deploy time — these are not real secrets and are only used to validate the auth mechanism. | `charts/common/templates/externalsecret.yaml`, `charts/common/templates/secret.yaml`, `Makefile:5` |
 | **Proper filesystem isolation** | `readOnlyRootFilesystem: true` prevents all writes to the container filesystem. `capabilities.drop: [ALL]` removes every Linux capability. `allowPrivilegeEscalation: false` blocks privilege escalation via setuid/kernel exploits. The scratch base image has no shell, no package manager, and no OS utilities. CI integration test verifies all of these on every PR. | `charts/common/values.yaml:93-98`, `Dockerfile:14` (scratch), `.github/workflows/pr.yaml:164-171` |
 
 ### Kubernetes Requirements
@@ -337,51 +337,18 @@ No secrets exist in plaintext anywhere in the repository. The secret token reach
 
 #### How the Secret Reaches the Pod Per Environment
 
-| Environment | Mechanism | Where the real value lives | Command |
-|---|---|---|---|
-| Local dev (`make up`) | Helm `--set` | Hardcoded dev token in Makefile | `helm install --set common.secret.data.token=dev-secret-token` |
-| CI integration test | Helm `--set` | Hardcoded test token in workflow | `helm install --set common.secret.data.token=test-secret-token` |
-| Staging (CI deploy) | SOPS + helm-secrets | Encrypted in git, decrypted with `SOPS_AGE_KEY` GitHub secret | `helm secrets install -f values-secrets.enc.yaml` |
-| Dev with real secrets | SOPS + helm-secrets | Encrypted in git, decrypted with local `~/.sops/keys.txt` | `helm secrets install -f values-secrets.enc.yaml` |
-| Production | External Secrets Operator | AWS Secrets Manager / Akeyless | ESO controller syncs automatically |
+| Environment | Mechanism | Where the real value lives |
+|---|---|---|
+| Local dev (`make up`) | Helm `--set` | Hardcoded dev token in Makefile — any value works for testing |
+| CI integration test | Helm `--set` | Hardcoded test token in workflow — validates auth flow, not real secrets |
+| Staging | External Secrets Operator | Cloud secret store (AWS Secrets Manager / Akeyless) |
+| Production | External Secrets Operator | Cloud secret store (AWS Secrets Manager / Akeyless) |
 
-Local dev and CI don't need real secrets -- they only validate that the auth flow works (secret mount → read → token comparison). Any token value works for testing.
+Local dev and CI don't need real secrets -- they only validate that the auth flow works (secret mount → read → token comparison). Any token value works for testing. Staging and production use the same architecture: ESO syncing from a cloud secret store.
 
-#### SOPS + age (Local / Staging)
+#### External Secrets Operator (Staging + Production)
 
-[SOPS](https://github.com/getsops/sops) encrypts secret values in-repo using [age](https://age-encryption.org/) asymmetric encryption.
-
-**How it works:**
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Developer encrypts                                      │
-│  sops --encrypt values-secrets.yaml > values-secrets.enc.yaml │
-│         ↓ (uses age public key from .sops.yaml)         │
-│  Encrypted file committed to git (safe)                 │
-└─────────────────────────────────────────────────────────┘
-         ↓
-┌─────────────────────────────────────────────────────────┐
-│  At deploy time                                          │
-│  helm secrets install ... -f values-secrets.enc.yaml     │
-│         ↓ (uses age private key)                        │
-│  Decrypted in memory → passed to Helm → K8s Secret      │
-│  Plaintext never written to disk or git                  │
-└─────────────────────────────────────────────────────────┘
-```
-
-**Key management:**
-- The age **public key** is in `.sops.yaml` (committed, safe to share -- can only encrypt)
-- The age **private key** is stored:
-  - Locally at `~/.sops/keys.txt` (excluded via `.gitignore`)
-  - As a GitHub Actions secret `SOPS_AGE_KEY` (for CI staging deploys)
-- The encrypted file `deploy/ping-pong/values-secrets.enc.yaml` is committed (contains only ciphertext)
-
-**When to use:** Development environments, staging, and CI where you don't have a cloud secret store. Good for small teams where a single shared key is acceptable.
-
-#### External Secrets Operator (Production)
-
-In production, SOPS is not used at all. The [External Secrets Operator](https://external-secrets.io/) (ESO) runs as a controller in the cluster and syncs secrets from a cloud provider directly into Kubernetes Secrets.
+The [External Secrets Operator](https://external-secrets.io/) (ESO) runs as a controller in the cluster and syncs secrets from a cloud provider directly into Kubernetes Secrets. This is used in all deployed environments (staging and production).
 
 **How it works:**
 
@@ -398,7 +365,7 @@ In production, SOPS is not used at all. The [External Secrets Operator](https://
 │             into K8s Secret 'ping-pong' key 'token'"     │
 │         ↓ (ESO controller reconciles)                   │
 │  K8s Secret created/updated automatically                │
-│  Pod mounts it at /secrets/token (same as SOPS path)     │
+│  Pod mounts it at /secrets/token                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -407,7 +374,7 @@ In production, SOPS is not used at all. The [External Secrets Operator](https://
 # deploy/ping-pong/values.yaml
 common:
   externalSecrets:
-    enabled: true          # switches from SOPS to ESO
+    enabled: true
     secretStoreRef: cluster-secret-store
     data:
       - secretKey: token
@@ -415,21 +382,19 @@ common:
           key: ping-pong/token
 ```
 
-**When to use:** Production environments with a cloud secret store. Provides automatic rotation, audit logging, centralized access control, and no encryption keys needed on the cluster.
+When `externalSecrets.enabled: true`, the Helm chart renders an `ExternalSecret` CRD instead of a plain Kubernetes Secret. The ESO controller watches this CRD and creates the actual Secret by pulling the value from the cloud store.
 
-#### SOPS vs External Secrets Operator
+**Why ESO for all deployed environments:**
+- **No secrets in git** — not even encrypted. The secret value lives only in the cloud store.
+- **Automatic rotation** — ESO polls or watches for changes. When a secret rotates in AWS Secrets Manager, the Kubernetes Secret updates automatically without a redeploy.
+- **Audit logging** — every secret access is logged by the cloud provider (CloudTrail, etc.)
+- **Centralized access control** — IAM policies control who can read/write secrets, not shared encryption keys.
+- **Same architecture everywhere** — staging and production use identical infrastructure, reducing environment drift.
 
-| | SOPS + age | External Secrets Operator |
-|---|---|---|
-| Secret storage | Encrypted in git | Cloud secret store (AWS SM, Akeyless) |
-| Decryption | At deploy time (helm-secrets) | Controller syncs continuously |
-| Key management | Single age keypair shared | IAM roles / service accounts |
-| Rotation | Re-encrypt and redeploy | Automatic (ESO polls or watches) |
-| Audit | Git history | Cloud provider audit logs |
-| Dependencies | helm-secrets plugin + age | ESO controller + ClusterSecretStore |
-| Best for | Small teams, dev/staging | Production, compliance, multi-team |
-
-**Why both:** SOPS gives you encrypted secrets in git with zero infrastructure dependencies -- perfect for bootstrapping, local dev, and CI. ESO gives you production-grade secret management with rotation, audit, and no keys on the cluster. The pod doesn't know or care which system created the Kubernetes Secret it mounts.
+**Why local dev and CI don't use ESO:**
+- No cloud infrastructure available in a Kind cluster or CI runner
+- Real secret values aren't needed — testing only validates the mechanism (mount → read → compare)
+- `--set` is simpler and has no dependencies
 
 ### Security Summary
 
@@ -444,7 +409,7 @@ common:
 | govulncheck | Detects known CVEs in Go dependencies at the call-graph level |
 | hadolint | Enforces Dockerfile best practices (pinned versions, minimal layers) |
 | CycloneDX SBOM | Full software bill of materials for supply chain transparency |
-| SOPS-encrypted secrets | No plaintext secrets in git; age encryption with controlled key distribution |
+| External Secrets Operator | Secrets synced from cloud store; no plaintext or encryption keys in git or cluster |
 | CI security verification | Integration test validates security context on every PR |
 
 ## Scaling Strategy
