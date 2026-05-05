@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/tomerzino/echo-tomer/compare/v1.0.0...v1.1.0) (2026-05-05)
+
+
+### Features
+
+* increase default replica count to 3 ([b0273c9](https://github.com/tomerzino/echo-tomer/commit/b0273c96ecef5879545453ab161951ac330a89af))
+* increase default replica count to 3 for better availability ([414212f](https://github.com/tomerzino/echo-tomer/commit/414212f4455719158bbda0ac9cc18a74655688cb))
+
 ## 1.0.0 (2026-05-05)
 
 
